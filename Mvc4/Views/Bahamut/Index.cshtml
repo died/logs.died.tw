@@ -1,0 +1,85 @@
+﻿@{
+    //ViewBag.Title = "BahamutAll";
+}
+@section styles {
+@Styles.Render("~/Content/themes/jqwidgets")
+}
+@section featured {
+    <section class="featured">
+        <div class="content-wrapper">
+            <hgroup class="title">
+                <h1>單日遊戲排行  遊戲人氣歷程</h1>
+            </hgroup>
+            <p>所有遊戲 線上遊戲</p>
+        </div>
+    </section>
+}
+<div id="timeline">
+   <ul id="dates">
+       <li><a href="#">2012.09.11</a></li>
+       <li><a href="#">2012.09.12</a></li>
+       <li><a href="#">2012.09.13</a></li>
+       <li><a href="#">2012.09.14</a></li>
+       <li><a href="#">2012.09.15</a></li>
+   </ul>
+   <ul id="issues">
+      <li id="date1">
+         <div id="jqxgrid"></div>
+      </li>
+   </ul>
+   <a href="#" id="next">+</a> <!-- optional -->
+   <a href="#" id="prev">-</a> <!-- optional -->
+</div>
+
+@section scripts {
+    @Scripts.Render("~/bundles/jqueryui", "~/bundles/bahamutday")
+    <script type="text/javascript">
+        var tt = 1;
+        function day(dd) {
+            var theme = getTheme();
+
+            // prepare the data
+            var source =
+                {
+                    datatype: "json",
+                    datafields: [
+                        { name: 'Rank', type: 'int' },
+                        { name: 'Popular' },
+                        { name: 'Article' },
+                        { name: 'Title' }
+                    ],
+                    url: "Service/datacenter.ashx",
+                    data: {
+                        m: "d",
+                        d: dd,
+                        t: tt
+                    }
+                };
+
+            var dataAdapter = new $.jqx.dataAdapter(source, {
+                downloadComplete: function (data, status, xhr) { },
+                loadComplete: function (data) { },
+                loadError: function (xhr, status, error) { alert(xhr + '\n' + status + '\n' + error); }
+            });
+
+            $("#jqxgrid").jqxGrid(
+                {
+                    width: 700,
+                    source: dataAdapter,
+                    theme: theme,
+                    columnsresize: true,
+                    columns: [
+                        { text: '排名', datafield: 'Rank', width: 40 },
+                        { text: '名稱', datafield: 'Title' },
+                        { text: '人氣', datafield: 'Popular', width: 100 },
+                        { text: '文章', datafield: 'Article', width: 100 }
+                    ]
+                });
+        }
+
+        $(document).ready(function () {
+            day("20120915");
+        });
+
+    </script>
+}
