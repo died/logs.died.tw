@@ -130,4 +130,13 @@ namespace Mvc4.App_Data
         public DateTime Date { get; set; }
         public string Change { get; set; }
     }
+
+    public class ScoreList
+    {
+        public string Popular { get; set; }
+        public string Article { get; set; }
+        public string Title { get; set; }
+        public string Link { get; set; }
+        public int Date { get; set; }
+    }
 }

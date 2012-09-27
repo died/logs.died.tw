@@ -18,16 +18,20 @@ namespace Mvc4
                         "~/Scripts/jquery.validate*"));
 
             bundles.Add(new ScriptBundle("~/bundles/bahamutday").Include(
-                    "~/Scripts/jqwidgets/jqxcore.js",
-                    "~/Scripts/jqwidgets/jqxbuttons.js",
-                    "~/Scripts/jqwidgets/jqxscrollbar.js",
-                    "~/Scripts/jqwidgets/jqxmenu.js",
-                    "~/Scripts/jqwidgets/jqxgrid.js",
-                    "~/Scripts/jqwidgets/jqxgrid.selection.js",
-                    "~/Scripts/jqwidgets/jqxgrid.columnsresize.js",
-                    "~/Scripts/jqwidgets/jqxdata.js",
-                    "~/Scripts/jquery.timelinr-0.9.51.js",
-                    "~/Scripts/gettheme.js"));
+                "~/Scripts/jqwidgets/jqxcore.js",
+                "~/Scripts/jqwidgets/jqxbuttons.js",
+                "~/Scripts/jqwidgets/jqxscrollbar.js",
+                "~/Scripts/jqwidgets/jqxmenu.js",
+                "~/Scripts/jqwidgets/jqxgrid.js",
+                "~/Scripts/jqwidgets/jqxgrid.selection.js",
+                "~/Scripts/jqwidgets/jqxgrid.columnsresize.js",
+                "~/Scripts/jqwidgets/jqxdata.js",
+                "~/Scripts/jquery.timelinr-0.9.51.js",
+                "~/Scripts/gettheme.js"));
+
+            bundles.Add(new ScriptBundle("~/bundles/bahamutgame").Include(
+               "~/Scripts/hichart/highcharts.js",
+               "~/Scripts/hichart/themes/gray.js"));
 
             // 使用開發版本的 Modernizr 進行開發並學習。然後，當您
             // 準備好實際執行時，請使用 http://modernizr.com 上的建置工具，只選擇您需要的測試。
@@ -52,6 +56,7 @@ namespace Mvc4
 
             bundles.Add(new StyleBundle("~/Content/themes/jqwidgets").Include(
                     "~/Scripts/jqwidgets/styles/jqx.base.css"));
+
         }
     }
 }

@@ -5,7 +5,6 @@ namespace Mvc4.Controllers
 {
     public class BahamutController : Controller
     {
-        private TTransport Transport { get; set; }
         //
         // GET: /Bahamut/
 
@@ -15,6 +14,11 @@ namespace Mvc4.Controllers
             return View();
         }
 
+        public ActionResult Chart()
+        {
+            ViewBag.Title = "";
+            return View();
+        }
         //
         // GET: /Bahamut/Details/5
 
