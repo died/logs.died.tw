@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using Apache.Cassandra;
 using Thrift.Protocol;
@@ -6,9 +7,39 @@ using Thrift.Transport;
 
 namespace Mvc4.App_Data
 {
-    public class ThriftTool 
+    public class ThriftTool
     {
-        #region ThriftTool
+        #region Get
+        public static Cassandra.Client GetClient(string keyspace, ref TTransport transport)
+        {
+            TTransport frameTransport = new TFramedTransport(new TSocket("localhost", 9160));
+            TProtocol frameProtocol = new TBinaryProtocol(frameTransport);
+            var client = new Cassandra.Client(frameProtocol, frameProtocol);
+            frameTransport.Open();
+            client.set_keyspace(keyspace);
+            transport = frameTransport;
+            return client;
+        }
+
+        public static List<KeySlice> GetAllFromCF(string cf, int count, Cassandra.Client client)
+        {
+            return client.get_range_slices(GetParent(cf), GetPredicate(count), GetKeyRange(count), ConsistencyLevel.ONE);
+        }
+        #endregion
+
+        #region Set
+        public void AddColumn(string key, string cf, string name, string value, Cassandra.Client client)
+        {
+            client.insert(ToByte(key), GetParent(cf), NewColumn(name, value), ConsistencyLevel.ONE);
+        }
+
+        public void AddColumn(string key, string cf, string name, int value, Cassandra.Client client)
+        {
+            client.insert(ToByte(key), GetParent(cf), NewColumn(name, value), ConsistencyLevel.ONE);
+        }
+        #endregion
+
+        #region Tool
         /// <summary>
         /// Convert string to Byte[]
         /// </summary>
@@ -63,30 +94,63 @@ namespace Mvc4.App_Data
             };
         }
 
-        public static Cassandra.Client GetClient(string keyspace, ref TTransport transport)
+        public static SlicePredicate GetPredicate (int count)
         {
-            TTransport frameTransport = new TFramedTransport(new TSocket("localhost", 9160));
-            TProtocol frameProtocol = new TBinaryProtocol(frameTransport);
-            var client = new Cassandra.Client(frameProtocol, frameProtocol);
-
-            frameTransport.Open();
-            client.set_keyspace(keyspace);
-            transport = frameTransport;
-            return client;
+            return new SlicePredicate
+            {
+                Slice_range = new SliceRange
+                {
+                    Start = new byte[0],
+                    Finish = new byte[0],
+                    Count = count,
+                    Reversed = false
+                }
+            };
         }
 
-        public void AddColumn(string key, string cf, string name, string value, Cassandra.Client client)
+        public static SlicePredicate GetPredicate(string start,string end, int count)
         {
-            var cp = new ColumnParent { Column_family = cf };
-            client.insert(ToByte(key), cp, NewColumn(name, value), ConsistencyLevel.ONE);
+            return new SlicePredicate
+            {
+                Slice_range = new SliceRange
+                {
+                    Start = ToByte(start),
+                    Finish = ToByte(end),
+                    Count = count,
+                    Reversed = false
+                }
+            };
         }
 
-        public void AddColumn(string key, string cf, string name, int value, Cassandra.Client client)
+        public static KeyRange GetKeyRange(int count)
         {
-            var cp = new ColumnParent { Column_family = cf };
-            client.insert(ToByte(key), cp, NewColumn(name, value), ConsistencyLevel.ONE);
+            return new KeyRange
+            {
+                Count = count,
+                Start_key = new byte[0],
+                End_key = new byte[0]
+            };
         }
 
+        public static KeyRange GetKeyRange(string startKey,string endKey,int count)
+        {
+            return new KeyRange
+            {
+                Count = count,
+                Start_key = ToByte(startKey),
+                End_key = ToByte(endKey)
+            };
+        }
+
+        public static ColumnParent GetParent(string cf)
+        {
+            return new ColumnParent { Column_family = cf };
+        }
+
+        /// <summary>
+        /// Close Connection
+        /// </summary>
+        /// <param name="transport">Exists Connect</param>
         public static void TransportClose(ref TTransport transport)
         {
             transport.Flush();

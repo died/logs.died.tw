@@ -34,11 +34,9 @@ namespace Mvc4.Service
                     break;
                 case "g":
                     str = JsonConvert.SerializeObject(BahaGetOneGame(game, startDate , endDate));
-                    //str = BahaGetOneGame(game, startDate, endDate);
                     break;
             }
             context.Response.Write(str);
-
         }
 
         public bool IsReusable
@@ -83,20 +81,10 @@ namespace Mvc4.Service
             var rank = new List<RankList>();
 
             var client = ThriftTool.GetClient("default",ref _transport);
-            var parent = new ColumnParent { Column_family = columnFamily };
-            var predicate = new SlicePredicate
-            {
-                Slice_range = new SliceRange
-                {
-                    Start = new byte[0],
-                    Finish = new byte[0],
-                    Count = 100,
-                    Reversed = false
-                }
-            };
+
             var lb = new List<byte[]> { ThriftTool.ToByte(key) };
 
-            Dictionary<byte[], List<ColumnOrSuperColumn>> results = client.multiget_slice(lb, parent, predicate, ConsistencyLevel.ONE);
+            Dictionary<byte[], List<ColumnOrSuperColumn>> results = client.multiget_slice(lb, ThriftTool.GetParent(columnFamily), ThriftTool.GetPredicate(100), ConsistencyLevel.ONE);
 
             if (results.Count > 0) //if have result
             {
@@ -132,51 +120,61 @@ namespace Mvc4.Service
 
         public HighChart[] BahaGetOneGame(string game, string startDate, string endDate)
         {
-            var rank = new List<ScoreList>();
-
+            
+            var gameList = game.Split(',');
+            var chartList = new HighChart[gameList.Length];
             var client = ThriftTool.GetClient("default", ref _transport);
 
-            CqlResult cqlResult = client.execute_cql_query(ThriftTool.ToByte("select * from BahamutGames where Title='" + game +"'"), Compression.NONE);
-
-            foreach (CqlRow t in cqlResult.Rows)
+            for(var i=0;i<gameList.Length;i++)
             {
-                var rl = new ScoreList();
-                foreach (var col in t.Columns)
+                var rank = new List<ScoreList>();
+                CqlResult cqlResult = client.execute_cql_query(ThriftTool.ToByte("select * from BahamutGames where Title='" + gameList[i] + "'"), Compression.NONE);
+
+                foreach (CqlRow t in cqlResult.Rows)
                 {
-                    var name = ThriftTool.ToString(col.Name);
-                    switch(name)
+                    var rl = new ScoreList();
+                    foreach (var col in t.Columns)
                     {
-                        case "Title":
-                            rl.Title = ThriftTool.ToString(col.Value);
-                            break;
-                        case "Link":
-                            rl.Link = ThriftTool.ToString(col.Value);
-                            break;
-                        case "Article":
-                            rl.Article = ThriftTool.ToString(col.Value);
-                            break;
-                        case "Popular":
-                            rl.Popular = ThriftTool.ToString(col.Value);
-                            break;
-                        case "Date":
-                            rl.Date = ThriftTool.ToInt(col.Value);
-                            break;
+                        var name = ThriftTool.ToString(col.Name);
+                        switch (name)
+                        {
+                            case "Title":
+                                rl.Title = ThriftTool.ToString(col.Value);
+                                break;
+                            case "Link":
+                                rl.Link = ThriftTool.ToString(col.Value);
+                                break;
+                            case "Article":
+                                rl.Article = ThriftTool.ToString(col.Value);
+                                break;
+                            case "Popular":
+                                rl.Popular = ThriftTool.ToString(col.Value);
+                                break;
+                            case "Date":
+                                rl.Date = ThriftTool.ToInt(col.Value);
+                                break;
+                        }
                     }
+                    rank.Add(rl);
                 }
-                rank.Add(rl);
+                
+                var ranks = from n in rank orderby n.Date select n;
+
+                chartList[i] = ParseToHighChart(ranks);
             }
             ThriftTool.TransportClose(ref _transport);
-            var ranks = from n in rank orderby n.Date select n;
-            HighChart[] chartList = new HighChart[1];
-            chartList[0] = ParseToHighChart(ranks);
+
             return chartList;
         }
 
         public HighChart ParseToHighChart(IOrderedEnumerable<ScoreList> source)
         {
-            var hiChart = new HighChart {Name = source.First().Title};
-            var dataSet = source.Select(s => ParseDateAndNumber(s.Date, s.Popular)).ToList();
-            hiChart.Data = dataSet;
+            var hiChart = new HighChart();
+            if(source.Any())
+            {
+                hiChart.Name = source.First().Title;
+                hiChart.Data = source.Select(s => ParseDateAndNumber(s.Date, s.Popular)).ToList();
+            }
             return hiChart;
         }
 

@@ -1,5 +1,18 @@
-﻿@{
-    //ViewBag.Title = "Chart";
+﻿@using Mvc4.Controllers
+@{
+    ViewBag.Title = "巴哈姆特遊戲人氣歷程";
+}
+@section styles {
+@Styles.Render("~/Content/multiselect")
+<style type="text/css">
+#search {width: 150px;margin-bottom: 5px;height: 16px;}
+#selectaera{ width: 100%; margin-bottom: 10px;}
+#selectdate {width: 50%;float: left;}
+#selectgame {width: 50%;float: right;font-size: 12px;}
+#ms-searchable .ms-selection {margin-top: 37px;}
+.ms-container ul.ms-list {background-color: white;}
+.ms-container .ms-selectable {background-color: transparent;margin-right: 25px;}
+</style>
 }
 @section featured {
     <section class="featured">
@@ -11,12 +24,29 @@
         </div>
     </section>
 }
-
+<div id="selectaera" >
+    <div id="selectdate"></div>
+    <div id="selectgame">
+        <select id='searchable' multiple='multiple'>
+             @BahamutController.GenGameList()
+        </select>   
+    </div>
+</div>
 <div id="container" style="width: 100%; height: 400px"></div>
 
 @section scripts {
     @Scripts.Render("~/bundles/jqueryui", "~/bundles/bahamutgame")
     <script type="text/javascript">
+        var gamelist=[];
+
+        var chart = new Highcharts.Chart({
+            chart: { renderTo: 'container', type: 'spline' },
+            title: { text: 'Bahamut Game Popular' },
+            subtitle: { text: 'source from www.gamer.com.tw' },
+            xAxis: { type: 'datetime' },
+            yAxis: { title: { text: 'Popular Index'} }
+        });
+        
         function printObject(o) {
             var out = '';
             for (var p in o) {
@@ -25,33 +55,62 @@
             alert(out);
         }
 
-        $(document).ready(function() {
-            var option = {
-                chart: { renderTo: 'container', type: 'spline' },
-                title: { text: 'Bahamut Game Popular' },
-                subtitle: { text: 'source from www.gamer.com.tw' },
-                xAxis: { type: 'datetime' },
-                yAxis: { title: { text: '人氣值' } },
-                series: [{ }]
-            };
-
-            $.getJSON('/service/datacenter.ashx?m=g&g=WOW%20%E9%AD%94%E7%8D%B8%E4%B8%96%E7%95%8C&s=1&e=1',
-                function(data) {
-
-                    for (var j = 0; j < data.length; j++) {
-                        var seriesData = [];
-                        var chartData = data[j]['Data'];
-                        var chartName = data[j]['Name'];
-                        for (var i = 0; i < chartData.length; i++) {
-                            var x = new Date(chartData[i].Date).getTime();
-                            var y = chartData[i].Value;
-                            seriesData.push([x, y]);
-                        }
-                        option.series[j].name = chartName;
-                        option.series[j].data = seriesData;
+        function addline(game) {
+        gamelist.push(game);
+        $.getJSON('/service/datacenter.ashx?m=g&g='+game+'&s=1&e=1',
+            function (data) {
+                for (var j = 0; j < data.length; j++) {
+                    var seriesData = [];
+                    var chartData = data[j].Data;
+                    var chartName = data[j].Name;
+                    for (var i = 0; i < chartData.length; i++) {
+                        var x = new Date(chartData[i].Date).getTime();
+                        var y = chartData[i].Value;
+                        seriesData.push([x, y]);
                     }
-                    new Highcharts.Chart(option);
+                    chart.addSeries({
+                        name: chartName,
+                        data: seriesData
+                    });
+                }
+            });
+        }
+
+        function removeline(game) {
+            var index = $.inArray(game, gamelist);
+            if (index > -1) {
+                chart.series[index].remove();
+                gamelist = jQuery.grep(gamelist, function (value) {
+                    return value != game;
                 });
+            }
+        }
+
+        $(document).ready(function () {
+
+            $('#searchable').multiSelect({
+                selectableHeader: "<input type='text' id='search' autocomplete='off' placeholder='search game name'>",
+                afterSelect: function (value, text) {
+                    addline(value);
+                },
+                afterDeselect: function (value, text) {
+                    removeline(value);
+                }
+            });
+
+            $('#search').quicksearch(
+                $('li', '#ms-searchable')).on('keydown', function(e) {
+                    if (e.keyCode == 40) {
+                        $(this).trigger('focusout');
+                        $('#searchable').focus();
+                        return false;
+                    }
+                }
+                );
+
+
+
+
         });
 
     </script>

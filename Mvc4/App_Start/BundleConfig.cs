@@ -31,7 +31,9 @@ namespace Mvc4
 
             bundles.Add(new ScriptBundle("~/bundles/bahamutgame").Include(
                "~/Scripts/hichart/highcharts.js",
-               "~/Scripts/hichart/themes/gray.js"));
+               "~/Scripts/hichart/themes/gray.js",
+               "~/Scripts/multiselect/jquery.multi-select.js",
+               "~/Scripts/jquery.quicksearch.js"));
 
             // 使用開發版本的 Modernizr 進行開發並學習。然後，當您
             // 準備好實際執行時，請使用 http://modernizr.com 上的建置工具，只選擇您需要的測試。
@@ -57,6 +59,8 @@ namespace Mvc4
             bundles.Add(new StyleBundle("~/Content/themes/jqwidgets").Include(
                     "~/Scripts/jqwidgets/styles/jqx.base.css"));
 
+            bundles.Add(new StyleBundle("~/Content/multiselect").Include(
+                     "~/Scripts/multiselect/multi-select.css"));
         }
     }
 }

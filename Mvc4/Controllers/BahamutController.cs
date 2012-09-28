@@ -1,10 +1,13 @@
-﻿using System.Web.Mvc;
+﻿using System.Text;
+using System.Web.Mvc;
+using Mvc4.App_Data;
 using Thrift.Transport;
 
 namespace Mvc4.Controllers
 {
     public class BahamutController : Controller
     {
+        private static TTransport _transport;
         //
         // GET: /Bahamut/
 
@@ -19,6 +22,24 @@ namespace Mvc4.Controllers
             ViewBag.Title = "";
             return View();
         }
+
+        public static MvcHtmlString GenGameList()
+        {
+            var client = ThriftTool.GetClient("default",ref _transport);
+            var result = ThriftTool.GetAllFromCF("GameList", 200, client);
+            ThriftTool.TransportClose(ref _transport);
+            var sb = new StringBuilder();
+            foreach (var ks in result)
+            {
+                foreach (var keySlice in ks.Columns)
+                {
+                    var key = ThriftTool.ToString(keySlice.Column.Name);
+                    sb.Append("<option value='" + key + "'>" + key + "</option>");
+                }
+            }
+            return new MvcHtmlString(sb.ToString());
+        }
+
         //
         // GET: /Bahamut/Details/5
 
