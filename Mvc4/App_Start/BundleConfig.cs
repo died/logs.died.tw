@@ -31,6 +31,7 @@ namespace Mvc4
 
             bundles.Add(new ScriptBundle("~/bundles/bahamutgame").Include(
                "~/Scripts/hichart/highcharts.js",
+               "~/Scripts/hichart/modules/exporting.js",
                "~/Scripts/hichart/themes/gray.js",
                "~/Scripts/multiselect/jquery.multi-select.js",
                "~/Scripts/jquery.quicksearch.js"));

@@ -3,6 +3,16 @@
 }
 @section styles {
 @Styles.Render("~/Content/themes/jqwidgets")
+<style type="text/css">
+#grad_left {
+left: 0;
+background: url('/images/grad_left.png') repeat-y;
+}
+#grad_right {
+right: 0;
+background: url('/images/grad_right.png') repeat-y;
+}
+</style>
 }
 @section featured {
     <section class="featured">
@@ -16,19 +26,21 @@
 }
 <div id="timeline">
    <ul id="dates">
-       <li><a href="#">2012.09.11</a></li>
-       <li><a href="#">2012.09.12</a></li>
-       <li><a href="#">2012.09.13</a></li>
-       <li><a href="#">2012.09.14</a></li>
-       <li><a href="#">2012.09.15</a></li>
+       <li><a >2012.09.11</a></li>
+       <li><a >2012.09.12</a></li>
+       <li><a >2012.09.13</a></li>
+       <li><a >2012.09.14</a></li>
+       <li><a >2012.09.15</a></li>
    </ul>
-   <ul id="issues">
-      <li id="date1">
-         <div id="jqxgrid"></div>
-      </li>
-   </ul>
-   <a href="#" id="next">+</a> <!-- optional -->
-   <a href="#" id="prev">-</a> <!-- optional -->
+    <ul id="issues">
+        <li id="date1">
+            <div id="jqxgrid"></div>
+        </li>
+    </ul>
+    <div id="grad_left"></div>
+    <div id="grad_right"></div>
+   <a id="next">+</a> <!-- optional -->
+   <a id="prev">-</a> <!-- optional -->
 </div>
 
 @section scripts {
@@ -57,8 +69,8 @@
                 };
 
             var dataAdapter = new $.jqx.dataAdapter(source, {
-                downloadComplete: function (data, status, xhr) { },
-                loadComplete: function (data) { },
+                //downloadComplete: function (data, status, xhr) { },
+                //loadComplete: function (data) { },
                 loadError: function (xhr, status, error) { alert(xhr + '\n' + status + '\n' + error); }
             });
 
@@ -79,6 +91,7 @@
 
         $(document).ready(function () {
             day("20120926");
+            $().timelinr();
         });
 
     </script>

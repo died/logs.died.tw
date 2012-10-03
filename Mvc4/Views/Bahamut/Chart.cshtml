@@ -5,34 +5,29 @@
 @section styles {
 @Styles.Render("~/Content/multiselect")
 <style type="text/css">
-#search {width: 150px;margin-bottom: 5px;height: 16px;}
-#selectaera{ width: 100%; margin-bottom: 10px;}
-#selectdate {width: 50%;float: left;}
-#selectgame {width: 50%;float: right;font-size: 12px;}
+#search {width: 190px;margin-bottom: 5px;height: 16px;}
+#selectgame {width: 100%;float:inherit;font-size: 12px;}
 #ms-searchable .ms-selection {margin-top: 37px;}
 .ms-container ul.ms-list {background-color: white;}
-.ms-container .ms-selectable {background-color: transparent;margin-right: 25px;}
+.ms-container .ms-selectable {background-color: transparent;margin-right: 30px;}
 </style>
 }
 @section featured {
     <section class="featured">
         <div class="content-wrapper">
             <hgroup class="title">
-                <h1>@Html.ActionLink("單日遊戲排行", "Index", "Bahamut")  遊戲人氣歷程</h1>
+                <h2>@Html.ActionLink("單日遊戲排行", "Index", "Bahamut")  遊戲人氣歷程</h2>
             </hgroup>
-            <p>所有遊戲 線上遊戲</p>
         </div>
     </section>
 }
-<div id="selectaera" >
-    <div id="selectdate"></div>
-    <div id="selectgame">
-        <select id='searchable' multiple='multiple'>
-             @BahamutController.GenGameList()
-        </select>   
-    </div>
+<div id="selectgame">
+    <select id='searchable' multiple='multiple'>
+        @BahamutController.GenGameList()
+    </select>   
 </div>
-<div id="container" style="width: 100%; height: 400px"></div>
+
+<div id="container" style="width: 100%; height: 450px"></div>
 
 @section scripts {
     @Scripts.Render("~/bundles/jqueryui", "~/bundles/bahamutgame")
@@ -40,9 +35,9 @@
         var gamelist=[];
 
         var chart = new Highcharts.Chart({
-            chart: { renderTo: 'container', type: 'spline' },
+            chart: { renderTo: 'container', zoomType: 'x', type: 'spline' },
             title: { text: 'Bahamut Game Popular' },
-            subtitle: { text: 'source from www.gamer.com.tw' },
+            subtitle: { text: '-source from www.gamer.com.tw  -chart from logs.died.tw' },
             xAxis: { type: 'datetime' },
             yAxis: { title: { text: 'Popular Index'} }
         });
@@ -56,22 +51,26 @@
         }
 
         function addline(game) {
-        gamelist.push(game);
-        $.getJSON('/service/datacenter.ashx?m=g&g='+game+'&s=1&e=1',
+            $.getJSON('/service/datacenter.ashx?m=g&g=' + game + '&s=1&e=1',
             function (data) {
                 for (var j = 0; j < data.length; j++) {
                     var seriesData = [];
                     var chartData = data[j].Data;
                     var chartName = data[j].Name;
-                    for (var i = 0; i < chartData.length; i++) {
-                        var x = new Date(chartData[i].Date).getTime();
-                        var y = chartData[i].Value;
-                        seriesData.push([x, y]);
+                    if (chartName != null) {
+                        for (var i = 0; i < chartData.length; i++) {
+                            var x = new Date(chartData[i].Date).getTime();
+                            var y = chartData[i].Value;
+                            seriesData.push([x, y]);
+                        }
+                        gamelist.push(game);
+                        chart.addSeries({
+                            name: chartName,
+                            data: seriesData
+                        });
+                    } else {
+                        alert(game + ' has no data!!');
                     }
-                    chart.addSeries({
-                        name: chartName,
-                        data: seriesData
-                    });
                 }
             });
         }
@@ -105,6 +104,7 @@
                         $('#searchable').focus();
                         return false;
                     }
+                    return true;
                 }
                 );
 

@@ -40,6 +40,23 @@ namespace Mvc4.Controllers
             return new MvcHtmlString(sb.ToString());
         }
 
+        public static MvcHtmlString GenDayList()
+        {
+            var client = ThriftTool.GetClient("default", ref _transport);
+            var result = ThriftTool.GetAllFromCF("BahamutDays", 30, client);
+            ThriftTool.TransportClose(ref _transport);
+            var sb = new StringBuilder();
+            foreach (var ks in result)
+            {
+                foreach (var keySlice in ks.Columns)
+                {
+                    var key = ThriftTool.ToString(keySlice.Column.Name);
+                    sb.Append("<option value='" + key + "'>" + key + "</option>");
+                }
+            }
+            return new MvcHtmlString(sb.ToString());
+        }
+
         //
         // GET: /Bahamut/Details/5
 

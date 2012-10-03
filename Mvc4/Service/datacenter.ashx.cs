@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Web;
 using Apache.Cassandra;
@@ -180,7 +181,7 @@ namespace Mvc4.Service
 
         public Popular ParseDateAndNumber(int date, string popular)
         {
-            var t = date.ToString();
+            var t = date.ToString(CultureInfo.InvariantCulture);
             var sd = t.Substring(0, 4) + "/" + t.Substring(4, 2) + "/" + t.Substring(6,2);
             return new Popular { Date = DateTime.Parse(sd) ,Value = int.Parse(popular)};
         }
