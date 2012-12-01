@@ -70,30 +70,6 @@ namespace Mvc4.App_Data
             return res;
         }
 
-        public static string StripTagsCharArray(string source)
-        {
-            var array = new char[source.Length];
-            int arrayIndex = 0;
-            bool inside = false;
-
-            foreach (char @let in source)
-            {
-                if (@let == '<')
-                {
-                    inside = true;
-                    continue;
-                }
-                if (@let == '>')
-                {
-                    inside = false;
-                    continue;
-                }
-                if (inside) continue;
-                array[arrayIndex] = @let;
-                arrayIndex++;
-            }
-            return new string(array, 0, arrayIndex).Trim();
-        }
 
         public static bool IsValidUrl(string url)
         {
@@ -120,9 +96,6 @@ namespace Mvc4.App_Data
     public class RankList
     {
         public int Rank { get; set; }
-        //public int Popular { get; set; }
-        //public int Article { get; set; }
-        //public string Rank { get; set; }
         public string Popular { get; set; }
         public string Article { get; set; }
         public string Title { get; set; }
@@ -131,6 +104,7 @@ namespace Mvc4.App_Data
         public string Change { get; set; }
     }
 
+    [Serializable]
     public class ScoreList
     {
         public string Popular { get; set; }

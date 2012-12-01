@@ -1,0 +1,117 @@
+﻿@using Mvc4.Controllers
+@{
+    ViewBag.Title = "巴哈姆特遊戲人氣歷程";
+}
+@section styles {
+@Styles.Render("~/Content/multiselect")
+<style type="text/css">
+#search {width: 190px;margin-bottom: 5px;height: 16px;}
+#selectgame {width: 100%;float:inherit;font-size: 12px;}
+#ms-searchable .ms-selection {margin-top: 37px;}
+.ms-container ul.ms-list {background-color: white;}
+.ms-container .ms-selectable {background-color: transparent;margin-right: 30px;}
+</style>
+}
+@section featured {
+    <section class="featured">
+        <div class="content-wrapper">
+            <hgroup class="title">
+                <h2>@Html.ActionLink("單日遊戲排行", "Index", "Bahamut")  遊戲人氣歷程</h2>
+            </hgroup>
+        </div>
+    </section>
+}
+<div id="selectgame">
+    <select id='searchable' multiple='multiple'>
+        @BahamutController.GenGameList()
+    </select>   
+</div>
+
+<div id="container" style="width: 100%; height: 450px"></div>
+
+@section scripts {
+    @Scripts.Render("~/bundles/jqueryui", "~/bundles/bahamutgame")
+    <script type="text/javascript">
+        var gamelist=[];
+
+        var chart = new Highcharts.Chart({
+            chart: { renderTo: 'container', zoomType: 'x', type: 'spline' },
+            title: { text: 'Bahamut Game Popular' },
+            subtitle: { text: '-source from www.gamer.com.tw  -chart from logs.died.tw' },
+            xAxis: { type: 'datetime' },
+            yAxis: { title: { text: 'Popular Index'} }
+        });
+        
+        function printObject(o) {
+            var out = '';
+            for (var p in o) {
+                out += p + ': ' + o[p] + '\n';
+            }
+            alert(out);
+        }
+
+        function addline(game) {
+            $.getJSON('/service/datacenter.ashx?m=g&g=' + game + '&s=1&e=1',
+            function (data) {
+                for (var j = 0; j < data.length; j++) {
+                    var seriesData = [];
+                    var chartData = data[j].Data;
+                    var chartName = data[j].Name;
+                    if (chartName != null) {
+                        for (var i = 0; i < chartData.length; i++) {
+                            var x = new Date(chartData[i].Date).getTime();
+                            var y = chartData[i].Value;
+                            seriesData.push([x, y]);
+                        }
+                        gamelist.push(game);
+                        chart.addSeries({
+                            name: chartName,
+                            data: seriesData
+                        });
+                    } else {
+                        alert(game + ' has no data!!');
+                    }
+                }
+            });
+        }
+
+        function removeline(game) {
+            var index = $.inArray(game, gamelist);
+            if (index > -1) {
+                chart.series[index].remove();
+                gamelist = jQuery.grep(gamelist, function (value) {
+                    return value != game;
+                });
+            }
+        }
+
+        $(document).ready(function () {
+
+            $('#searchable').multiSelect({
+                selectableHeader: "<input type='text' id='search' autocomplete='off' placeholder='search game name'>",
+                afterSelect: function (value, text) {
+                    addline(value);
+                },
+                afterDeselect: function (value, text) {
+                    removeline(value);
+                }
+            });
+
+            $('#search').quicksearch(
+                $('li', '#ms-searchable')).on('keydown', function(e) {
+                    if (e.keyCode == 40) {
+                        $(this).trigger('focusout');
+                        $('#searchable').focus();
+                        return false;
+                    }
+                    return true;
+                }
+                );
+
+
+
+
+        });
+
+    </script>
+}

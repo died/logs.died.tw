@@ -1,13 +1,11 @@
 ﻿using System.Text;
 using System.Web.Mvc;
-using Mvc4.App_Data;
-using Thrift.Transport;
+using DiedTool;
 
 namespace Mvc4.Controllers
 {
     public class BahamutController : Controller
     {
-        private static TTransport _transport;
         //
         // GET: /Bahamut/
 
@@ -19,15 +17,14 @@ namespace Mvc4.Controllers
 
         public ActionResult Chart()
         {
-            ViewBag.Title = "";
+            ViewBag.Title = string.Empty;
             return View();
         }
 
         public static MvcHtmlString GenGameList()
         {
-            var client = ThriftTool.GetClient("default",ref _transport);
-            var result = ThriftTool.GetAllFromCF("GameList", 200, client);
-            ThriftTool.TransportClose(ref _transport);
+            var result = ThriftTool.GetAllFromCF("GameList", 200);
+            ThriftTool.TransportClose();
             var sb = new StringBuilder();
             foreach (var ks in result)
             {
@@ -42,9 +39,8 @@ namespace Mvc4.Controllers
 
         public static MvcHtmlString GenDayList()
         {
-            var client = ThriftTool.GetClient("default", ref _transport);
-            var result = ThriftTool.GetAllFromCF("BahamutDays", 30, client);
-            ThriftTool.TransportClose(ref _transport);
+            var result = ThriftTool.GetAllFromCF("BahamutDays", 30);
+            ThriftTool.TransportClose();
             var sb = new StringBuilder();
             foreach (var ks in result)
             {

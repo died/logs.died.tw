@@ -5,8 +5,7 @@ using System.Linq;
 using System.Web;
 using Apache.Cassandra;
 using Newtonsoft.Json;
-using Thrift.Transport;
-using Mvc4.App_Data;
+using DiedTool;
 
 namespace Mvc4.Service
 {
@@ -15,8 +14,6 @@ namespace Mvc4.Service
     /// </summary>
     public class Datacenter : IHttpHandler
     {
-
-        private TTransport _transport;
 
         public void ProcessRequest(HttpContext context)
         {
@@ -30,11 +27,14 @@ namespace Mvc4.Service
             var str = string.Empty;
             switch (mode)
             {
-                case "d":
+                case "d":   //get one day's rank 1~100
                     str = JsonConvert.SerializeObject(BahaGetOneDay(date, GetColumnFamily(type)));
                     break;
-                case "g":
+                case "g":   //get game history
                     str = JsonConvert.SerializeObject(BahaGetOneGame(game, startDate , endDate));
+                    break;
+                case "t":   //get day list
+                    str = JsonConvert.SerializeObject(BahaGetDayList(GetColumnFamily(type)));
                     break;
             }
             context.Response.Write(str);
@@ -81,9 +81,9 @@ namespace Mvc4.Service
         {
             var rank = new List<RankList>();
 
-            var client = ThriftTool.GetClient("default",ref _transport);
-
             var lb = new List<byte[]> { ThriftTool.ToByte(key) };
+
+            var client = ThriftTool.GetClient();
 
             Dictionary<byte[], List<ColumnOrSuperColumn>> results = client.multiget_slice(lb, ThriftTool.GetParent(columnFamily), ThriftTool.GetPredicate(100), ConsistencyLevel.ONE);
 
@@ -113,7 +113,7 @@ namespace Mvc4.Service
                 }
             }
 
-            ThriftTool.TransportClose(ref _transport);
+            ThriftTool.TransportClose();
             var ranks = from n in rank orderby n.Rank select n;
 
             return ranks;
@@ -124,12 +124,10 @@ namespace Mvc4.Service
             
             var gameList = game.Split(',');
             var chartList = new HighChart[gameList.Length];
-            var client = ThriftTool.GetClient("default", ref _transport);
-
             for(var i=0;i<gameList.Length;i++)
             {
                 var rank = new List<ScoreList>();
-                CqlResult cqlResult = client.execute_cql_query(ThriftTool.ToByte("select * from BahamutGames where Title='" + gameList[i] + "'"), Compression.NONE);
+                var cqlResult = ThriftTool.GetByCql("select * from BahamutGames where Title='" + gameList[i] + "'");
 
                 foreach (CqlRow t in cqlResult.Rows)
                 {
@@ -163,9 +161,34 @@ namespace Mvc4.Service
 
                 chartList[i] = ParseToHighChart(ranks);
             }
-            ThriftTool.TransportClose(ref _transport);
+            //ThriftTool.TransportClose();
 
             return chartList;
+        }
+
+        public List<string> BahaGetDayList(string mode)
+        {
+            var result = new List<string>();
+
+            var cqlResult = ThriftTool.GetByCql("select first 30 Date from BahamutDays where Mode='" + mode + "'");
+
+            foreach (CqlRow t in cqlResult.Rows)
+            {
+                foreach (var col in t.Columns)
+                {
+                    var name = ThriftTool.ToString(col.Name);
+                    switch (name)
+                    {
+                        case "Date":
+                            result.Add(ThriftTool.ToString(col.Value));
+                            break;
+                    }
+                }
+            }
+            //ThriftTool.TransportClose();
+            result.Sort();
+
+            return result;
         }
 
         public HighChart ParseToHighChart(IOrderedEnumerable<ScoreList> source)

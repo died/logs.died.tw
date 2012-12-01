@@ -9,34 +9,68 @@ namespace Mvc4.App_Data
 {
     public class ThriftTool
     {
+        private static TTransport _transport;
+        private static string _keySpace="default";
+
         #region Get
-        public static Cassandra.Client GetClient(string keyspace, ref TTransport transport)
+        public static Cassandra.Client GetClient()
         {
-            TTransport frameTransport = new TFramedTransport(new TSocket("localhost", 9160));
-            TProtocol frameProtocol = new TBinaryProtocol(frameTransport);
-            var client = new Cassandra.Client(frameProtocol, frameProtocol);
-            frameTransport.Open();
-            client.set_keyspace(keyspace);
-            transport = frameTransport;
+            if(_transport==null) _transport = new TFramedTransport(new TSocket("localhost", 9160));
+            TProtocol frameProtocol = new TBinaryProtocol(_transport);
+            var client = new Cassandra.Client(frameProtocol);
+            if(!_transport.IsOpen) _transport.Open();
+            client.set_keyspace(_keySpace);
             return client;
         }
 
-        public static List<KeySlice> GetAllFromCF(string cf, int count, Cassandra.Client client)
+        public static List<KeySlice> GetAllFromCF(string cf, int count)
         {
-            return client.get_range_slices(GetParent(cf), GetPredicate(count), GetKeyRange(count), ConsistencyLevel.ONE);
+            return GetClient().get_range_slices(GetParent(cf), GetPredicate(count), GetKeyRange(count), ConsistencyLevel.ONE);
         }
+
+        public static bool CheckExist(string key, string cf)
+        {
+            var count = GetClient().get_count(ToByte(key), GetParent(cf), GetPredicate(5), ConsistencyLevel.ONE);
+            return (count > 0);
+        }
+
+        public static CqlResult GetByCql(string query)
+        {
+            return GetClient().execute_cql_query(ToByte(query), Compression.NONE);
+        }
+
         #endregion
 
-        #region Set
-        public void AddColumn(string key, string cf, string name, string value, Cassandra.Client client)
+        public static void SetKeySpace(string keyspace)
         {
-            client.insert(ToByte(key), GetParent(cf), NewColumn(name, value), ConsistencyLevel.ONE);
+            _keySpace = keyspace;
         }
 
-        public void AddColumn(string key, string cf, string name, int value, Cassandra.Client client)
+        #region Set
+        public static void AddColumn(string key, string cf, string name, string value)
         {
-            client.insert(ToByte(key), GetParent(cf), NewColumn(name, value), ConsistencyLevel.ONE);
+            GetClient().insert(ToByte(key), GetParent(cf), NewColumn(name, value), ConsistencyLevel.ONE);
         }
+
+        public static void AddColumn(string key, string cf, string name, int value)
+        {
+            GetClient().insert(ToByte(key), GetParent(cf), NewColumn(name, value), ConsistencyLevel.ONE);
+
+        }
+
+        public static void AddClass<T>(T target,string key,string cf)
+        {
+            foreach (T element in (IEnumerable<T>) target)
+            {
+                
+            }
+        }
+
+        public static void CounterAdd(string key,string cf,string name,int incre)
+        {
+            GetClient().add(ToByte(key), GetParent(cf), NewCounterColumn(name, incre), ConsistencyLevel.ONE);
+        }
+
         #endregion
 
         #region Tool
@@ -70,7 +104,7 @@ namespace Mvc4.App_Data
             return BitConverter.ToInt32(byt, 0);
         }
 
-        public Column NewColumn(string key, string value)
+        public static Column NewColumn(string key, string value)
         {
             return new Column
             {
@@ -82,7 +116,7 @@ namespace Mvc4.App_Data
             };
         }
 
-        public Column NewColumn(string key, int value)
+        public static Column NewColumn(string key, int value)
         {
             return new Column
             {
@@ -91,6 +125,15 @@ namespace Mvc4.App_Data
                 Timestamp =
                     Convert.ToInt64(
                         DateTime.UtcNow.AddHours(8).Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds)
+            };
+        }
+
+        public static CounterColumn NewCounterColumn(string key, int value)
+        {
+            return new CounterColumn
+            {
+                Name = ToByte(key),
+                Value = value
             };
         }
 
@@ -150,11 +193,11 @@ namespace Mvc4.App_Data
         /// <summary>
         /// Close Connection
         /// </summary>
-        /// <param name="transport">Exists Connect</param>
-        public static void TransportClose(ref TTransport transport)
+        public static void TransportClose()
         {
-            transport.Flush();
-            transport.Close();
+            if (_transport == null) return;
+            if(_transport.IsOpen) _transport.Close();
+            _transport.Dispose();
         }
 
         #endregion 
