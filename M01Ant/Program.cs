@@ -6,13 +6,14 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Apache.Cassandra;
 using DiedTool;
 
 namespace M01Ant
 {
     class Program
     {
-        private static readonly object LockFile = new object();  
+  
 
         static void Main()
         {
@@ -21,34 +22,23 @@ namespace M01Ant
             //Mobile01Tool.Testit();
             //Logging("Mobile01 bot start");
             //ThriftTool.ThriftTool.
-            //PraseQueue(5);
+            //PraseQueue(5000);
+            PraseNnN();
             //Logging("Mobile01 bot end");
             //PraseFourm();
-            try
-            {
-                var client = ThriftTool.GetClient();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                //throw;
-            }
-            
+
+
         }
 
         static List<string> LoadingFourmList()
         {
             var lineList = new List<string>();
-            string line = null;
+            string line;
             var file =new StreamReader("forumlist.txt");
             while ((line = file.ReadLine()) != null)
             {
-                if (line.Length>10)
-                {
-                    if(line.Substring(0,1)!="#") lineList.Add(line);
-                }
-                
-                line = null;
+                if (line.Length <= 10) continue;
+                if(line.Substring(0,1)!="#") lineList.Add(line);
             }
 
             file.Close();
@@ -57,58 +47,57 @@ namespace M01Ant
 
         static void PraseFourm()
         {
-            Logging("Start Prasing Forum");
+            Utility.Logging("Start Prasing Forum", Utility.DebugLevel.Info);
             var list = LoadingFourmList();
             foreach (var fourmUrl in list)
             {
-                Logging("Prasing Forum : " + fourmUrl);
+                Utility.Logging("Prasing Forum : " + fourmUrl, Utility.DebugLevel.Info);
                 Mobile01Tool.ProcessForum(fourmUrl);
                 Thread.Sleep(Mobile01Tool.ChangeForum);
             }
-
         }
 
         static void PraseQueue(int limit)
         {
-            Logging("Prasing Queue limit : " + limit);
-            Mobile01Tool.ProcessQueue();
+            Utility.Logging("Prasing Queue limit : " + limit,Utility.DebugLevel.Info);
+            Mobile01Tool.ProcessQueue(limit);
         }
 
-        public static void Logging(string log)
-        {
-            //if(level!= (int)DebugLevel.Info)
-            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff ") + log);
-            WriteFile(DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss.fff ") + log);
-        }
 
-        //static void Logging(string log)
-        //{
-        //    Logging(log,(int)DebugLevel.Error);
-        //}
-
-        private static void WriteFile(string logtxt)
+        static void PraseNnN()
         {
-            using (var fs = new FileStream(GetPath(@"logs\","Mobile01"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            var count = 0;
+            //Utility.Logging("Calculating N vs N from: " + count, Utility.DebugLevel.Info);
+            var re = ThriftTool.GetAllFromCF("M01UserRelaction", 120000);
+            foreach(var node in re)
             {
-                using (var log = new StreamWriter(fs))
+                if (count % 1000 == 0) Utility.Logging("Calculating N vs N from: " + count, Utility.DebugLevel.Info);
+                foreach (var keySlice in node.Columns)
                 {
-                    lock (LockFile)
+                    if (node.Key != keySlice.Counter_column.Name)
                     {
-                        log.WriteLine(logtxt);
+                        Check2NodeValue(ThriftTool.ToString(node.Key), ThriftTool.ToString(keySlice.Counter_column.Name), keySlice.Counter_column.Value);
                     }
                 }
+                count++;
             }
+            Utility.Logging("total count: " + count, Utility.DebugLevel.Info);
         }
 
-        private static string GetPath(string directory,string file)
+        static void Check2NodeValue(string n1,string n2,long val)
         {
-            var filename = file + DateTime.Now.ToString(" yyyy-MM-dd") + ".txt";
-            directory = Path.GetPathRoot(Path.GetFullPath(".")) + directory;
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            return directory + filename;
+            if (n1 == n2) return;
+            var secondVal = ThriftTool.GetSingleCounter(ThriftTool.ToByte(n2), "M01UserRelaction", n1);
+
+            //save N1>N2
+            if (Int32.Parse(n2) > Int32.Parse(n1)) Utility.Swap(ref n1, ref n2);
+            ThriftTool.CounterAdd(n1 + "_" + n2, "M01UserRelactionN2", "sum", val + secondVal);
+        }
+
+        static long Get2NodeValue(int n1,int n2)
+        {
+            if (n2 > n1) Utility.Swap(ref n1, ref n2);
+            return ThriftTool.GetSingleCounter(ThriftTool.ToByte(n1 + "_" + n2), "M01UserRelactionN2", "sum");
         }
 
         /// <summary>
@@ -132,10 +121,5 @@ namespace M01Ant
 
     }
 
-    //public enum DebugLevel
-    //{
-    //    Error=0,
-    //    Warning=1,
-    //    Info=2
-    //}
+
 }

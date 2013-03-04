@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Apache.Cassandra;
 using Thrift.Protocol;
 using Thrift.Transport;
@@ -12,20 +11,62 @@ namespace DiedTool
     public class ThriftTool
     {
         private static TTransport _transport;
+        //private static Cassandra.Client _client;
         private static string _keySpace = "default";
+        private static bool _setKeySpace = false;
 
         #region Get
         public static Cassandra.Client GetClient()
         {
-            if (_transport == null) _transport = new TFramedTransport(new TSocket("localhost", 9160));
-            TProtocol frameProtocol = new TBinaryProtocol(_transport);
-            var client = new Cassandra.Client(frameProtocol);
-            if (!_transport.IsOpen) _transport.Open();
-            client.set_keyspace(_keySpace);
-            //Console.WriteLine(client.recv_system_add_keyspace());
-            return client;
+            //if (_client == null)
+            //{
+                if (_transport == null) _transport = new TFramedTransport(new TSocket("localhost", 9160));
+                //TProtocol frameProtocol = new TBinaryProtocol(_transport);
+                var client = new Cassandra.Client(new TBinaryProtocol(_transport));
+                if(!_transport.IsOpen)
+                {
+                    try
+                    {
+                        _transport.Open();
+                    }catch(Exception)
+                    {
+                    }
+
+                }
+
+                    
+                if (!_setKeySpace)
+                {
+                    client.set_keyspace(_keySpace);
+                    _setKeySpace = true;
+                }
+                return client;
+            //}
+            //return _client;
         }
 
+        //public ThriftTool()
+        //{
+        //    if (_client == null)
+        //    {
+        //        _client = GetClient();
+        //    }
+            
+        //}
+
+        //~ThriftTool()
+        //{
+        //    _transport.Close();
+        //    _transport.Dispose();
+        //    _client = null;
+        //}
+
+        /// <summary>
+        /// 取得某個Column Family內的指定數量列資料
+        /// </summary>
+        /// <param name="cf">Column Family</param>
+        /// <param name="count">數量</param>
+        /// <returns></returns>
         public static List<KeySlice> GetAllFromCF(string cf, int count)
         {
             return GetClient().get_range_slices(GetParent(cf), GetPredicate(count), GetKeyRange(count), ConsistencyLevel.ONE);
@@ -36,12 +77,45 @@ namespace DiedTool
             return GetClient().multiget_slice(lb, GetParent(columnFamily), GetPredicate(count), ConsistencyLevel.ONE);
         }
 
+        public static List<ColumnOrSuperColumn> GetSingleKey(byte[] key, string columnFamily, int count)
+        {
+            //Utility.Logging("key="+ToString(key));
+            
+            return GetClient().get_slice(key, GetParent(columnFamily), GetPredicate(count), ConsistencyLevel.ONE);
+        }
+
+        public static long GetSingleCounter(byte[] key,string columnFamily,string count)
+        {
+            try
+            {
+                return GetClient().get(key, GetColumnPath(columnFamily, count), ConsistencyLevel.ONE).Counter_column.Value;
+            }
+            catch (NotFoundException)
+            {
+                return 0;
+            }
+        }
+
+
+        /// <summary>
+        /// Check key exist or not
+        /// 確認某個key值是否存在
+        /// </summary>
+        /// <param name="key">Key</param>
+        /// <param name="cf">Column Family</param>
+        /// <returns></returns>
         public static bool CheckExist(string key, string cf)
         {
             var count = GetClient().get_count(ToByte(key), GetParent(cf), GetPredicate(5), ConsistencyLevel.ONE);
             return (count > 0);
         }
 
+        /// <summary>
+        /// Using Cassandra Query Language to query and get result
+        /// 回傳CQL查詢結果
+        /// </summary>
+        /// <param name="query">Query String</param>
+        /// <returns></returns>
         public static CqlResult GetByCql(string query)
         {
             return GetClient().execute_cql_query(ToByte(query), Compression.NONE);
@@ -49,6 +123,10 @@ namespace DiedTool
 
         #endregion
 
+        /// <summary>
+        /// 設定KeySpace所在
+        /// </summary>
+        /// <param name="keyspace">KeySpace</param>
         public static void SetKeySpace(string keyspace)
         {
             _keySpace = keyspace;
@@ -74,7 +152,7 @@ namespace DiedTool
         //    }
         //}
 
-        public static void CounterAdd(string key, string cf, string name, int incre)
+        public static void CounterAdd(string key, string cf, string name, long incre)
         {
             GetClient().add(ToByte(key), GetParent(cf), NewCounterColumn(name, incre), ConsistencyLevel.ONE);
         }
@@ -109,7 +187,14 @@ namespace DiedTool
 
         public static int ToInt(byte[] byt)
         {
+            //if (BitConverter.IsLittleEndian) Array.Reverse(byt);
             return BitConverter.ToInt32(byt, 0);
+        }
+
+        public static long ToLong(byte[] byt)
+        {
+            //if (BitConverter.IsLittleEndian) Array.Reverse(byt);
+            return BitConverter.ToUInt32(byt, 0);
         }
 
         public static Column NewColumn(string key, string value)
@@ -136,7 +221,7 @@ namespace DiedTool
             };
         }
 
-        public static CounterColumn NewCounterColumn(string key, int value)
+        public static CounterColumn NewCounterColumn(string key, long value)
         {
             return new CounterColumn
             {
@@ -171,6 +256,15 @@ namespace DiedTool
                     Reversed = false
                 }
             };
+        }
+
+        public static ColumnPath GetColumnPath(string cf,string counter)
+        {
+            return new ColumnPath
+                       {
+                           Column_family = cf,
+                           Column = ToByte(counter)
+                       };
         }
 
         public static KeyRange GetKeyRange(int count)

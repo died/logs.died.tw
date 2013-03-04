@@ -1,122 +1,167 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Mvc;
 using Apache.Cassandra;
 
 namespace DiedTool
 {
     public class Mobile01Tool
     {
-        public static int TempCounter;
+        public static int ErrorCounter;
         public static string TempLog;
 
-        public static int ChangePage = 2300;
+        public static int ChangePage = 3000;
         public static int ChangeForum = 5000;
-        public static int ChangeTopic = 4000;
+        public static int ChangeTopic = 2500;
 
-        public static void Testit()
+        public static string Testit()
         {
-            Console.WriteLine("Processing Url = " );
+            
+            CqlResult cqlResult = ThriftTool.GetByCql("Select * from UrlQueue where 'Status'='" + QueueType.Done + "' and 'Type'='M01' limit 50000");
+            //foreach (var row in cqlResult.Rows)
+            //{
+            //    var url = new UrlQueue();
+            //    foreach (var col in row.Columns)
+            //    {
+            //        var name = ThriftTool.ToString(col.Name);
+
+            //        switch (name)
+            //        {
+            //            case "Title":
+            //                url.Title = ThriftTool.ToString(col.Value);
+            //                break;
+            //            case "Url":
+            //                url.Url = ThriftTool.ToString(col.Value);
+            //                break;
+            //            case "Status":
+            //                url.Status = ThriftTool.ToString(col.Value);
+            //                break;
+            //            case "Type":
+            //                url.Type = ThriftTool.ToString(col.Value);
+            //                break;
+            //        }
+            //    }
+
+
+            //    //mark as done
+            //    ThriftTool.AddColumn(url.Url, "UrlQueue", "Status", QueueType.Queue.ToString());
+            //}
+            return cqlResult.Rows.Count.ToString(CultureInfo.InvariantCulture);
             //ThriftTool.CounterAdd("65535", "M01UserRelaction", "65536", 1);
         }
 
-        public static void ProcessUrl(string url, int thisPage, string aid, string aowner)
+        /// <summary>
+        /// 處理文章
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="thisPage"></param>
+        /// <param name="aid"></param>
+        /// <param name="aowner"></param>
+        public static bool ProcessUrl(string url, int thisPage, string aid, string aowner)
         {
+            var pageTotal = string.Empty;
             var thisUrl = url;
             if (thisPage != 1)
                 thisUrl = url + "&p=" + thisPage;
 
-            Console.WriteLine("Processing Url = " + thisUrl);
-            
-            //TempLog += "page=" + thisPage + new HtmlString("<BR>");
-            //var aid = string.Empty;
-            //var aowner = string.Empty;
+            Utility.Logging("Processing Url = " + thisUrl,Utility.DebugLevel.Info);
 
             try
             {
                 var forum = thisUrl.Split(new[] { "f=" }, StringSplitOptions.RemoveEmptyEntries)[1].Split('&')[0];
 
                 //Get Content
-                var source = WebTool.GetHtmlUtf8(thisUrl);
-                TempLog = source;
-                source = WebTool.GetContent("<div class=\"forum-content\">", "<div class=\"sidebar\">", source);
+                var source = WebTool.GetHtmlAsyncUtf8(thisUrl);
 
-                //Get Title
-                var title = WebTool.GetContent("<h2 class=\"topic\">", "</h2>", source);
-                //Get Page
-                var page = WebTool.GetContent("<p class=\"numbers\">", "</p>", source);
-                //var pageNow = WebTool.GetContent("<span>", "</span>", page);
-                var pageTotal = WebTool.GetContent("共", "頁", page);
+                //if (!string.IsNullOrEmpty(source))
+                //{
+                    //if (source.IndexOf("action=\"error.php\"", System.StringComparison.Ordinal) == -1) return;
+                //Console.WriteLine("Processing Url start");
 
-                //process post -begin-
-                source = WebTool.GetContent("<div class=\"single-post\">", "<div class=\"pagination\">", source);
-                var ar = source.Split(new[] { "<div class=\"single-post\">" }, StringSplitOptions.RemoveEmptyEntries);
+                    source = WebTool.GetContent("<div class=\"forum-content\">", "<div class=\"sidebar\">", source);
 
-                //Get all
-                foreach (var s in ar)
-                {
-                    ProcessPost(s, ref aid, ref aowner, forum, title);
-                }
+                    //Get Title
+                    var title = WebTool.GetContent("<h2 class=\"topic\">", "</h2>", source);
+                    //Get Page
+                    var page = WebTool.GetContent("<p class=\"numbers\">", "</p>", source);
+                    //var pageNow = WebTool.GetContent("<span>", "</span>", page);
+                    pageTotal = WebTool.GetContent("共", "頁", page);
+
+                    //process post -begin-
+                    source = WebTool.GetContent("<div class=\"single-post\">", "<div class=\"pagination\">", source);
+                    var ar = source.Split(new[] { "<div class=\"single-post\">" }, StringSplitOptions.RemoveEmptyEntries);
+
+                    //Get all
+                    foreach (var s in ar)
+                    {
+                        ProcessPost(s, ref aid, ref aowner, forum, title);
+                    }
+                //}
+
+
                 //process post -end-
                 //ThriftTool.TransportClose(ref _transport);
 
-                //TempCounter++;
-
-                if (thisPage < int.Parse(pageTotal))
-                {
-                    Thread.Sleep(ChangePage);
-                    ProcessUrl(url, thisPage + 1, aid, aowner);
-                }
-                //else
-                //{
-                //    ThriftTool.TransportClose();
-                //}
-                
+                if (thisPage >= int.Parse(pageTotal)) return true;
+                Thread.Sleep(ChangePage);
+                return ProcessUrl(url, thisPage + 1, aid, aowner);
             }
             catch (Exception ex)
             {
-                TempLog += ex.Message;
-                //throw;
+                Utility.Logging("ProcessUrl Error:" + ex.Message);
+                return false;
             }
-
-
-
         }
 
-        public static void ProcessUrl(string url)
+        public static bool ProcessUrl(string url)
         {
-            ProcessUrl(url, 1, null, null);
+            return ProcessUrl(url, 1, null, null);
         }
 
+        /// <summary>
+        /// 處理列表
+        /// </summary>
+        /// <param name="forumUrl"></param>
+        /// <param name="thisPage"></param>
         public static void ProcessForum(string forumUrl, int thisPage)
         {
             var thisUrl = forumUrl;
             if (thisPage != 1)
                 thisUrl = forumUrl + "&p=" + thisPage;
             //Get Content
-            Console.WriteLine("Processing Forum = " + thisUrl);
-            var source = WebTool.GetHtmlUtf8(thisUrl);
+            Utility.Logging("Processing Forum = " + thisUrl,Utility.DebugLevel.Info);
 
-            //Get Page
-            var page = WebTool.GetContent("<p class=\"numbers\">", "</p>", source);
-            //var pageNow = WebTool.GetContent("<span>", "</span>", page);
-            var pageTotal = WebTool.GetContent("共", "頁", page);
+            var source = string.Empty;
+            var page = string.Empty;
+            var pageTotal = string.Empty;
 
-            source = WebTool.GetContent("<table summary=\"文章列表\">", "</table>", source);
-            source = WebTool.GetContent("<tbody>", "</tbody>", source).Replace("\n", string.Empty); //topic list
-            var arTopic = source.Split(new[] { "<tr>" }, StringSplitOptions.RemoveEmptyEntries);
-            arTopic = arTopic.Where(x => x.Trim().Length > 10).ToArray();
-            foreach (var s in arTopic)
-            {
-                var topicUrl = WebTool.GetContent("<a href=\"", "\"", s);
-                var topicTitle = WebTool.StripTagsCharArray((s.Split(new[] { "</td>" }, StringSplitOptions.RemoveEmptyEntries)[0])).Trim();
-                QueuePage(topicUrl, topicTitle);
-            }
-            //return arTopic.Count();
 
-            //ThriftTool.TransportClose();
+            source = WebTool.GetHtmlAsyncUtf8(thisUrl);
+
+            //if (!string.IsNullOrEmpty(source))
+            //{
+                
+                //Get Page
+                page = WebTool.GetContent("<p class=\"numbers\">", "</p>", source);
+                pageTotal = WebTool.GetContent("共", "頁", page);
+
+                source = WebTool.GetContent("<table summary=\"文章列表\">", "</table>", source);
+                source = WebTool.GetContent("<tbody>", "</tbody>", source).Replace("\n", string.Empty); //topic list
+
+
+                var arTopic = source.Split(new[] { "<tr>" }, StringSplitOptions.RemoveEmptyEntries);
+                arTopic = arTopic.Where(x => x.Trim().Length > 10).ToArray();
+                foreach (var s in arTopic)
+                {
+                    var topicUrl = WebTool.GetContent("<a href=\"", "\"", s);
+                    var topicTitle = WebTool.StripTagsCharArray((s.Split(new[] { "</td>" }, StringSplitOptions.RemoveEmptyEntries)[0])).Trim();
+                    QueuePage(topicUrl, topicTitle);
+                }
+            //}
 
             //go to next page
             if (thisPage < int.Parse(pageTotal))
@@ -124,11 +169,7 @@ namespace DiedTool
                 Thread.Sleep(ChangePage);
                 ProcessForum(forumUrl, thisPage + 1);
             }
-            //else
-            //{
-            //    ThriftTool.TransportClose();
-            //}
-            
+
         }
 
         public static void ProcessForum(string forumUrl)
@@ -146,10 +187,14 @@ namespace DiedTool
             var plevel = tmpar[1].Trim();
             var aid = string.Empty;
             var aowner = string.Empty;
+
+            //Console.WriteLine("ProcessPost uid:" + pid);
+
             if (plevel == "1")
             {
                 levelOnePid = pid;
                 levelOneUid = uid;
+                //Console.WriteLine("Post Level 1 > post id:" + levelOnePid + " user id:" + levelOneUid);
             }
             else
             {
@@ -157,8 +202,10 @@ namespace DiedTool
                 aowner = levelOneUid;   //article owner = self
                 //add counter
                 //need check if new***
-                if (!ThriftTool.CheckExist(uid, "M01UserRelaction"))
+                //if (!ThriftTool.CheckExist(uid, "M01UserRelaction"))
                     ThriftTool.CounterAdd(uid, "M01UserRelaction", levelOneUid, 1);
+
+                //Console.Write("Post Level 1 > post id:" + levelOnePid + " user id:" + levelOneUid);
             }
             var topic = new M01Topic
             {
@@ -190,6 +237,34 @@ namespace DiedTool
             ThriftTool.AddColumn(topic.Pid, "M01Topic", "Title", topic.Title);
         }
 
+        public static string GetRelactionCount()
+        {
+            var br = MvcHtmlString.Create("<br/>");
+            string resulr = string.Empty;
+            CqlResult cqlResult = ThriftTool.GetByCql("Select * from M01UserRelaction limit 100000");
+            // cqlResult.Rows
+            resulr = cqlResult.Rows.Count.ToString(CultureInfo.InvariantCulture) + br;
+            //var fir = cqlResult.Rows.First();
+            //foreach (var col in fir.Columns)
+            //{
+            //    resulr += "key:" + ThriftTool.ToString(fir.Key) + " name:" + ThriftTool.ToString(col.) + " value:" + ThriftTool.ToInt(col.Value) + br+Environment.NewLine;
+            //}
+
+
+            //var re = ThriftTool.GetAllFromCF("M01UserRelaction", 5);
+            //foreach (var ks in re)
+            //{
+            //    foreach (var keySlice in ks.Columns)
+            //    {
+            //        var key = ThriftTool.ToString(keySlice.Counter_column.Name);
+            //        var val = keySlice.Counter_column.Value;
+            //        resulr+=("\r\n key="+ThriftTool.ToString(ks.Key)+ "name='" + key + " value=" + val);
+            //    }
+            //}
+            
+            return resulr;
+        }
+
         public static void ProcessQueue()
         {
             ProcessQueue(5);
@@ -197,14 +272,10 @@ namespace DiedTool
 
         public static void ProcessQueue(int limit)
         {
-            //var result = string.Empty;
-
-            //int tempi = 0;
-
             CqlResult cqlResult = ThriftTool.GetByCql("Select * from UrlQueue where 'Status'='" + QueueType.Queue.ToString() + "' and 'Type'='M01' limit "+limit);
-            //result = cqlResult.Rows.Count.ToString();
-            //CqlResult cqlResult = ThriftTool.GetByCql("select top 1 * from UrlQueue where Status=" + (int)QueueType.Queue , client);
-            //CqlResult cqlResult = client.execute_cql_query(ThriftTool.ToByte("select * from BahamutGames where Title='" + gameList[i] + "'"), Compression.NONE);
+
+            if (cqlResult.Rows.Count < limit) Utility.Logging("select result count:" + cqlResult.Rows.Count);
+
             foreach (var row in cqlResult.Rows)
             {
                 var url = new UrlQueue();
@@ -227,23 +298,22 @@ namespace DiedTool
                             url.Type = ThriftTool.ToString(col.Value);
                             break;
                     }
-                    //result = url.Url;
-                    //process topic
-                    //result += url.Url;
-
                 }
+
+                //Console.WriteLine("Title:" + url.Title);
+                //Console.WriteLine("Url:" + url.Url);
+                //Console.WriteLine("Status:" + url.Status);
+                //Console.WriteLine("Type:" + url.Type);
 
                 if (url.Url != null)
                 {
-                    //result = "http://www.mobile01.com/" + url.Url;
+                    Thread.Sleep(ChangeTopic);
                     ProcessUrl("http://www.mobile01.com/" + url.Url);
-                    //tempi++;
                 }
 
                 //mark as done
                 ThriftTool.AddColumn(url.Url, "UrlQueue", "Status", QueueType.Done.ToString());
             }
-            //return tempi.ToString();
         }
 
         private static void QueuePage(string url, string title)
@@ -290,6 +360,41 @@ namespace DiedTool
         public string Type { get; set; }
         public string Title { get; set; }
         public string Status { get; set; }
+    }
+
+    [Serializable]
+    public class M01Relaction
+    {
+        public M01RelactionNode Nodes { get; set; }
+        public M01RelactionEdge Edges { get; set; }
+    }
+
+    [Serializable]
+    public class M01RelactionNode
+    {
+        public List<RelactionNode> NodeList { get; set; }
+    }
+
+    [Serializable]
+    public class M01RelactionEdge
+    {
+        public List<RelactionEdge> EdgeList { get; set; }
+    }
+
+    [Serializable]
+    public class RelactionEdge
+    {
+        public string id { get; set; }
+        public string source { get; set; }
+        public string target { get; set; }
+        public int weight { get; set; }
+    }
+
+    [Serializable]
+    public class RelactionNode
+    {
+        public string id { get; set; }
+        public int weight { get; set; }
     }
 
     public enum QueueType

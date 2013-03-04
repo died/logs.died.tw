@@ -253,6 +253,9 @@
     <Content Include="Images\grad_right.png" />
     <Content Include="Images\next.png" />
     <Content Include="Images\prev.png" />
+    <Content Include="Scripts\cytoscape\arbor.js" />
+    <Content Include="Scripts\cytoscape\cytoscape.js" />
+    <Content Include="Scripts\cytoscape\cytoscape.min.js" />
     <Content Include="Scripts\gettheme.js" />
     <Content Include="Scripts\hichart\adapters\mootools-adapter.js" />
     <Content Include="Scripts\hichart\adapters\mootools-adapter.src.js" />
@@ -624,6 +627,12 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Views\Home\M01test.cshtml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Views\Home\M01List.cshtml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Views\Home\M01Chart.cshtml" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

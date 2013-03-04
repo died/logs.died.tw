@@ -14,6 +14,9 @@ namespace Mvc4.Service
     /// </summary>
     public class Datacenter : IHttpHandler
     {
+        public List<RelactionNode> NodeList;
+        public List<RelactionEdge> EdgeList;
+        public List<string> NodeStringList; 
 
         public void ProcessRequest(HttpContext context)
         {
@@ -35,6 +38,9 @@ namespace Mvc4.Service
                     break;
                 case "t":   //get day list
                     str = JsonConvert.SerializeObject(BahaGetDayList(GetColumnFamily(type)));
+                    break;
+                case "uid":   //get m01 uid relaction
+                    str = JsonConvert.SerializeObject(M01GetUserRelaction(type));
                     break;
             }
             context.Response.Write(str);
@@ -164,6 +170,50 @@ namespace Mvc4.Service
             //ThriftTool.TransportClose();
 
             return chartList;
+        }
+
+        public M01Relaction M01GetUserRelaction(string uid)
+        {
+            NodeList = new List<RelactionNode>();
+            EdgeList = new List<RelactionEdge>();
+            NodeStringList = new List<string>();
+
+            RecursiveGetUser(uid);
+
+            var rel = new M01Relaction
+            {
+                Edges = new M01RelactionEdge { EdgeList = this.EdgeList },
+                Nodes = new M01RelactionNode { NodeList = this.NodeList }
+            };
+            return rel;
+        }
+
+        public void RecursiveGetUser(string uid,int gen)
+        {
+            gen++;
+            var result = ThriftTool.GetSingleKey(ThriftTool.ToByte(uid), "M01UserRelaction", 5000);
+
+            var node = new RelactionNode { id = uid, weight = result.Count };
+            if (!NodeList.Contains(node))
+            {
+                NodeList.Add(node); //add new node
+                NodeStringList.Add(uid);
+            }
+
+            if (gen >= 4) return;
+            foreach (var ks in result)
+            {
+                var target = ThriftTool.ToString(ks.Counter_column.Name);
+                var weight = (int)ks.Counter_column.Value;
+                var edge = new RelactionEdge { id = uid + "_" + target, source = uid, target = target, weight = weight };
+                EdgeList.Add(edge);
+                if (!NodeStringList.Contains(target)) RecursiveGetUser(target, gen);
+            }
+        }
+
+        public void RecursiveGetUser(string uid)
+        {
+            RecursiveGetUser(uid, 0);
         }
 
         public List<string> BahaGetDayList(string mode)

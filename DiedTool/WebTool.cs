@@ -14,6 +14,7 @@ namespace DiedTool
         {
             int start = source.IndexOf(sTag, StringComparison.InvariantCulture) + (!contain ? sTag.Length : 0);
             int end = source.IndexOf(eTag, start, StringComparison.InvariantCulture);
+            if (start < 0 || end < 0 || (end-start<0)) return null;
             return source.Substring(start, end - start + (contain ? sTag.Length + eTag.Length : 0));
         }
 
@@ -22,19 +23,20 @@ namespace DiedTool
             return GetContent(sTag, eTag, source, false);
         }
 
-        public static string GetHtmlUtf8(string url)
+        public static string GetHtml(string url,Encoding encode)
         {
             string res = null;
             var wRq = (HttpWebRequest)WebRequest.Create(url);
             wRq.Method = "GET";
             wRq.UserAgent = "Mozilla/5.0+(Windows+NT+6.1;+WOW64)+AppleWebKit/536.11+(KHTML,+like+Gecko)+Chrome/20.0.1132.57+Safari/536.11";
+
             using (WebResponse wRs = wRq.GetResponse())
             {
                 using (var s = wRs.GetResponseStream())
                 {
                     if (s != null)
                     {
-                        using (var sr = new StreamReader(s, Encoding.UTF8))
+                        using (var sr = new StreamReader(s, encode))
                         {
                             res = sr.ReadToEnd();
                         }
@@ -44,26 +46,56 @@ namespace DiedTool
             return res;
         }
 
+        public static string GetHtmlUtf8(string url)
+        {
+            return GetHtml(url, Encoding.UTF8);
+        }
+
         public static string GetHtmlDefault(string url)
         {
-            string res = null;
-            var wRq = (HttpWebRequest)WebRequest.Create(url);
-            wRq.Method = "GET";
-            wRq.UserAgent = "Mozilla/5.0+(Windows+NT+6.1;+WOW64)+AppleWebKit/536.11+(KHTML,+like+Gecko)+Chrome/20.0.1132.57+Safari/536.11";
-            using (WebResponse wRs = wRq.GetResponse())
+            return GetHtml(url, Encoding.Default);
+        }
+
+        public static string GetHtmlAsyncDefault(string url)
+        {
+            var task = MakeAsyncRequest(url, Encoding.Default);
+            return task.Result;
+        }
+
+        public static string GetHtmlAsyncUtf8(string url)
+        {
+            var task = MakeAsyncRequest(url, Encoding.UTF8);
+            return task.Result;
+        }
+
+        public static Task<string> MakeAsyncRequest(string url, Encoding encode)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(url);
+            request.ContentType = "text/html";
+            request.UserAgent = "Mozilla/5.0+(Windows+NT+6.1;+WOW64)+AppleWebKit/536.11+(KHTML,+like+Gecko)+Chrome/20.0.1132.57+Safari/536.11";
+            request.Method = WebRequestMethods.Http.Get;
+            request.Timeout = 10000;
+            request.Proxy = null;   
+
+            Task<WebResponse> task = Task.Factory.FromAsync(
+                request.BeginGetResponse,
+                asyncResult => request.EndGetResponse(asyncResult),null);
+
+            return task.ContinueWith(t => ReadStreamFromResponse(t.Result, encode));
+        }
+
+        private static string ReadStreamFromResponse(WebResponse response, Encoding encode)
+        {
+            using (Stream responseStream = response.GetResponseStream())
             {
-                using (var s = wRs.GetResponseStream())
+                if (responseStream == null) return null;
+                using (var sr = new StreamReader(responseStream, encode))
                 {
-                    if (s != null)
-                    {
-                        using (var sr = new StreamReader(s, Encoding.Default))
-                        {
-                            res = sr.ReadToEnd();
-                        }
-                    }
+                    //Need to return this response 
+                    string strContent = sr.ReadToEnd();
+                    return strContent;
                 }
             }
-            return res;
         }
 
         public static string StripTagsCharArray(string source)
