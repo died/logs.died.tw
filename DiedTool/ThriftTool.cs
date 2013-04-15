@@ -11,38 +11,47 @@ namespace DiedTool
     public class ThriftTool
     {
         private static TTransport _transport;
-        //private static Cassandra.Client _client;
+        private static Cassandra.Client _client;
         private static string _keySpace = "default";
         private static bool _setKeySpace = false;
 
         #region Get
         public static Cassandra.Client GetClient()
         {
-            //if (_client == null)
-            //{
+            if (_client == null)
+            {
                 if (_transport == null) _transport = new TFramedTransport(new TSocket("localhost", 9160));
-                //TProtocol frameProtocol = new TBinaryProtocol(_transport);
                 var client = new Cassandra.Client(new TBinaryProtocol(_transport));
-                if(!_transport.IsOpen)
+                if (!_transport.IsOpen)
                 {
                     try
                     {
                         _transport.Open();
-                    }catch(Exception)
-                    {
                     }
-
+                    catch (Exception e)
+                    {
+                        Utility.Logging("transport open fail:" + e.Message);
+                    }
                 }
 
-                    
                 if (!_setKeySpace)
                 {
                     client.set_keyspace(_keySpace);
                     _setKeySpace = true;
                 }
-                return client;
-            //}
-            //return _client;
+                //return client;
+                _client = client;
+            }
+            return _client;
+        }
+
+        public static Cassandra.Client GetWebClient()
+        {
+            var transport = new TFramedTransport(new TSocket("localhost", 9160));
+            var client = new Cassandra.Client(new TBinaryProtocol(transport));
+            transport.Open();
+            client.set_keyspace(_keySpace);
+            return client;
         }
 
         //public ThriftTool()
@@ -79,21 +88,27 @@ namespace DiedTool
 
         public static List<ColumnOrSuperColumn> GetSingleKey(byte[] key, string columnFamily, int count)
         {
-            //Utility.Logging("key="+ToString(key));
-            
             return GetClient().get_slice(key, GetParent(columnFamily), GetPredicate(count), ConsistencyLevel.ONE);
         }
 
-        public static long GetSingleCounter(byte[] key,string columnFamily,string count)
+        public static long GetSingleCounter(byte[] key, string columnFamily, string column)
         {
             try
             {
-                return GetClient().get(key, GetColumnPath(columnFamily, count), ConsistencyLevel.ONE).Counter_column.Value;
+                return GetClient().get(key, GetColumnPath(columnFamily, column), ConsistencyLevel.ONE).Counter_column.Value;
             }
             catch (NotFoundException)
             {
                 return 0;
             }
+        }
+
+        public static int GetKeyCount(string cf, string key, int count)
+        {
+            var bkey = ToByte(key);
+            if (string.IsNullOrEmpty(key)) bkey = new byte[] { };
+            GetClient().set_cql_version("3.0.0");
+            return GetClient().get_count(bkey, GetParent(cf), GetPredicate(count), ConsistencyLevel.ONE);
         }
 
 
@@ -118,7 +133,8 @@ namespace DiedTool
         /// <returns></returns>
         public static CqlResult GetByCql(string query)
         {
-            return GetClient().execute_cql_query(ToByte(query), Compression.NONE);
+            return GetClient().execute_cql3_query(ToByte(query), Compression.NONE, ConsistencyLevel.ONE);
+            //return GetClient().execute_cql_query(ToByte(query), Compression.NONE);
         }
 
         #endregion

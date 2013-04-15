@@ -4,7 +4,7 @@
 
 <h2>M01Chart</h2>
 @ViewBag.Result
-<input type="button" onclick="addline(36169)" value="click">
+<input type="button" onclick="addline(829591)" value="click">
 <div id="demo" style="width:800px;height:500px"></div>
 
 @section scripts {
@@ -33,7 +33,7 @@
             var demoNodes = [];
             var demoEdges = [];
             
-            $.getJSON('/service/datacenter.ashx?m=uid&t=1021740',
+            $.getJSON('/service/datacenter.ashx?m=uid&t=829591',
                 function (data) {
                     //alert(data.Nodes.NodeList[0].id);
                     var nodelist = data.Nodes.NodeList;

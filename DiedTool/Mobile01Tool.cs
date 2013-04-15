@@ -18,6 +18,8 @@ namespace DiedTool
         public static int ChangeForum = 5000;
         public static int ChangeTopic = 2500;
 
+        public static Dictionary<string, string> TmpUser = new Dictionary<string, string>();
+
         public static string Testit()
         {
             
@@ -135,33 +137,28 @@ namespace DiedTool
             //Get Content
             Utility.Logging("Processing Forum = " + thisUrl,Utility.DebugLevel.Info);
 
-            var source = string.Empty;
-            var page = string.Empty;
-            var pageTotal = string.Empty;
+            var source = WebTool.GetHtmlAsyncUtf8(thisUrl);
+              
+            //Get Page
+            var page = WebTool.GetContent("<p class=\"numbers\">", "</p>", source);
+            var pageTotal = WebTool.GetContent("共", "頁", page);
 
+            source = WebTool.GetContent("<table summary=\"文章列表\">", "</table>", source);
+            source = WebTool.GetContent("<tbody>", "</tbody>", source).Replace("\n", string.Empty); //topic list
 
-            source = WebTool.GetHtmlAsyncUtf8(thisUrl);
-
-            //if (!string.IsNullOrEmpty(source))
-            //{
-                
-                //Get Page
-                page = WebTool.GetContent("<p class=\"numbers\">", "</p>", source);
-                pageTotal = WebTool.GetContent("共", "頁", page);
-
-                source = WebTool.GetContent("<table summary=\"文章列表\">", "</table>", source);
-                source = WebTool.GetContent("<tbody>", "</tbody>", source).Replace("\n", string.Empty); //topic list
-
-
-                var arTopic = source.Split(new[] { "<tr>" }, StringSplitOptions.RemoveEmptyEntries);
-                arTopic = arTopic.Where(x => x.Trim().Length > 10).ToArray();
-                foreach (var s in arTopic)
-                {
-                    var topicUrl = WebTool.GetContent("<a href=\"", "\"", s);
-                    var topicTitle = WebTool.StripTagsCharArray((s.Split(new[] { "</td>" }, StringSplitOptions.RemoveEmptyEntries)[0])).Trim();
-                    QueuePage(topicUrl, topicTitle);
-                }
-            //}
+            var arTopic = source.Split(new[] { "<tr>" }, StringSplitOptions.RemoveEmptyEntries);
+            arTopic = arTopic.Where(x => x.Trim().Length > 10).ToArray();
+            foreach (var s in arTopic)
+            {
+                var reply = WebTool.GetContent("<td width=\"7%\" class=\"reply\">", "</td>", s).Replace(",", string.Empty);
+                var postDate = Convert.ToDateTime(WebTool.StripTagsCharArray(WebTool.GetContent("<td width=\"17%\" class=\"authur\">", "</p>", s)));
+                //if (postDate)
+                if (int.Parse(reply) >= 500) continue;
+                var url = WebTool.GetContent("<td class=\"subject\">", "</a>", s);
+                var topicUrl = WebTool.GetContent("<a href=\"", "\"", url);
+                var topicTitle = WebTool.StripTagsCharArray((url.Split(new[] { "</td>" }, StringSplitOptions.RemoveEmptyEntries)[0])).Trim();
+                QueuePage(topicUrl, topicTitle);
+            }
 
             //go to next page
             if (thisPage < int.Parse(pageTotal))
@@ -174,12 +171,14 @@ namespace DiedTool
 
         public static void ProcessForum(string forumUrl)
         {
+            TmpUser = new Dictionary<string, string>();
             ProcessForum(forumUrl, 1);
         }
 
         private static void ProcessPost(string post, ref string levelOneUid, ref string levelOnePid, string forum, string title)
         {
             var uid = WebTool.GetContent("userinfo.php?id=", "&", post);
+            var uName = WebTool.StripTagsCharArray(WebTool.GetContent("<div class=\"fn\">", "</div>", post));
             var content = WebTool.GetContent("<div class=\"single-post-content\">", "<div class=\"single-post-content-sig\">", post);
             var pid = WebTool.GetContent("<div id=\"ct", "\"", post);
             var tmpar = WebTool.GetContent("<div class=\"date\">", "</div>", post).Split('#');
@@ -187,25 +186,22 @@ namespace DiedTool
             var plevel = tmpar[1].Trim();
             var aid = string.Empty;
             var aowner = string.Empty;
-
-            //Console.WriteLine("ProcessPost uid:" + pid);
+            var blockquite = WebTool.GetContent("<blockquote>", "</blockquote>", post);
+            var replyTo = WebTool.GetContent("<b>", " wrote:</b>", blockquite);
+            if (!TmpUser.ContainsKey(uName)) TmpUser.Add(uName, uid);
 
             if (plevel == "1")
             {
                 levelOnePid = pid;
                 levelOneUid = uid;
-                //Console.WriteLine("Post Level 1 > post id:" + levelOnePid + " user id:" + levelOneUid);
             }
             else
             {
-                aid = levelOnePid;      //article = self
-                aowner = levelOneUid;   //article owner = self
+                aid = levelOnePid;      
+                aowner = levelOneUid;   
+             
                 //add counter
-                //need check if new***
-                //if (!ThriftTool.CheckExist(uid, "M01UserRelaction"))
-                    ThriftTool.CounterAdd(uid, "M01UserRelaction", levelOneUid, 1);
-
-                //Console.Write("Post Level 1 > post id:" + levelOnePid + " user id:" + levelOneUid);
+                ThriftTool.CounterAdd(uid, "M01UserRelaction",string.IsNullOrEmpty(replyTo) ? levelOneUid : TmpUser[replyTo], 1);
             }
             var topic = new M01Topic
             {
@@ -219,9 +215,8 @@ namespace DiedTool
                 Aowner = aowner,
                 Title = title
             };
-            SaveTopic(topic);
 
-            //TempLog += "topic Pid=" + topic.Pid + new HtmlString("<BR>") ;
+            SaveTopic(topic);
         }
 
         private static void SaveTopic(M01Topic topic)

@@ -16,7 +16,13 @@ namespace Mvc4.Service
     {
         public List<RelactionNode> NodeList;
         public List<RelactionEdge> EdgeList;
-        public List<string> NodeStringList; 
+        public List<string> NodeStringList;
+        public Cassandra.Client Client; 
+
+        public Datacenter()
+        {
+            Client = ThriftTool.GetClient();
+        }
 
         public void ProcessRequest(HttpContext context)
         {
@@ -89,9 +95,9 @@ namespace Mvc4.Service
 
             var lb = new List<byte[]> { ThriftTool.ToByte(key) };
 
-            var client = ThriftTool.GetClient();
 
-            Dictionary<byte[], List<ColumnOrSuperColumn>> results = client.multiget_slice(lb, ThriftTool.GetParent(columnFamily), ThriftTool.GetPredicate(100), ConsistencyLevel.ONE);
+
+            Dictionary<byte[], List<ColumnOrSuperColumn>> results = Client.multiget_slice(lb, ThriftTool.GetParent(columnFamily), ThriftTool.GetPredicate(100), ConsistencyLevel.ONE);
 
             if (results.Count > 0) //if have result
             {

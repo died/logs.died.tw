@@ -12,6 +12,7 @@ namespace DiedTool
     {
         public static string GetContent(string sTag, string eTag, string source, bool contain)
         {
+            if (string.IsNullOrEmpty(source)) return null;
             int start = source.IndexOf(sTag, StringComparison.InvariantCulture) + (!contain ? sTag.Length : 0);
             int end = source.IndexOf(eTag, start, StringComparison.InvariantCulture);
             if (start < 0 || end < 0 || (end-start<0)) return null;
